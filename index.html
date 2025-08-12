@@ -196,7 +196,7 @@
 
       <div class="feed-list" id="newsFeed">
         <!-- Card 1 -->
-        <div class="tweet-card" data-type="news" data-emotional="false">
+        <div class="tweet-card" data-tweet-id="t1" data-text="Federal Reserve announces interest rate decision following two-day policy meeting. New rate set at 5.25% with gradual adjustments planned for next quarter." data-type="news" data-emotional="false">
           <div class="tweet-header">
             <img class="avatar" src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" />
             <span class="tweet-username">Reuters <span class="verified">✔️</span></span>
@@ -223,7 +223,7 @@
         </div>
 
         <!-- Card 2 (filtered entertainment) -->
-        <div class="tweet-card filtered" data-type="entertainment">
+        <div class="tweet-card filtered" data-tweet-id="t2" data-text="New season of Stranger Things dropping next month! 🎬✨ Here's your first look at what's coming..." data-type="entertainment">
           <div class="tweet-header">
             <img class="avatar" src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" />
             <span class="tweet-username">Netflix</span>
@@ -250,7 +250,7 @@
         </div>
 
         <!-- Card 3 (emotional news) -->
-        <div class="tweet-card" data-type="news" data-emotional="true">
+        <div class="tweet-card" data-tweet-id="t3" data-text="🚨 BREAKING: EXPLOSIVE new revelations SHOCK the nation! Officials are OUTRAGED and FURIOUS about DEVASTATING developments that will DESTROY everything! This is UNBELIEVABLE! 😱🔥" data-type="news" data-emotional="true">
           <div class="tweet-header">
             <img class="avatar" src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" />
             <span class="tweet-username">Breaking Politics</span>
@@ -277,7 +277,7 @@
         </div>
 
         <!-- Card 4 -->
-        <div class="tweet-card" data-type="news" data-emotional="false">
+        <div class="tweet-card" data-tweet-id="t4" data-text="Scientists discover new species of deep-sea jellyfish in the Pacific Ocean. The creature glows in the dark and has unique tentacle patterns." data-type="news" data-emotional="false">
           <div class="tweet-header">
             <img class="avatar" src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" />
             <span class="tweet-username">BBC News</span>
@@ -304,7 +304,7 @@
         </div>
 
         <!-- Card 5 (filtered entertainment) -->
-        <div class="tweet-card filtered" data-type="entertainment">
+        <div class="tweet-card filtered" data-tweet-id="t5" data-text="The new Avengers trailer is here! Watch Earth's mightiest heroes assemble once again. #Avengers" data-type="entertainment">
           <div class="tweet-header">
             <img class="avatar" src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" />
             <span class="tweet-username">Marvel Studios</span>
@@ -331,7 +331,7 @@
         </div>
 
         <!-- Card 6 -->
-        <div class="tweet-card" data-type="news" data-emotional="false">
+        <div class="tweet-card" data-tweet-id="t6" data-text="Apple unveils new MacBook Pro lineup with M3 chips, improved battery life, and brighter displays." data-type="news" data-emotional="false">
           <div class="tweet-header">
             <img class="avatar" src="https://abs.twimg.com/sticky/default_profile_images/default_profile_400x400.png" alt="avatar" />
             <span class="tweet-username">TechCrunch</span>
@@ -362,35 +362,24 @@
 
   <script>
     // ====== Logs ======
+    // 全局日志
     const userLogs = [];
-    const actionCounts = {
-      toggle: 0, like: 0, comment: 0, retweet: 0, stats: 0, nextPage: 0, prevPage: 0, bookmark: 0, share: 0
-    };
-    let startTime = new Date();
-    let endTime = null;
-
     function logAction(action, detail = {}) {
-      const ts = new Date();
-      userLogs.push({ action, detail, timestamp: ts.toISOString() });
-      endTime = ts;
-
-      // Send log to Qualtrics parent page if embedded
+      const ts = new Date().toISOString();
+      const ev = { action, detail, ts };
+      userLogs.push(ev);
       if (window.parent && window.parent !== window) {
-        window.parent.postMessage(
-          { type: 'ff_log', action, detail, ts: ts.toISOString() },
-          '*'
-        );
+        window.parent.postMessage({ type: 'ff_log', ...ev }, '*');
       }
-
-      // quick counters
-      if (action === 'toggle_mode') actionCounts.toggle++;
-      if (action === 'click_like') actionCounts.like++;
-      if (action === 'click_comment' || action === 'send_comment') actionCounts.comment++;
-      if (action === 'click_retweet') actionCounts.retweet++;
-      if (action === 'click_stats') actionCounts.stats++;
-      if (action === 'click_bookmark') actionCounts.bookmark++;
-      if (action === 'click_share') actionCounts.share++;
     }
+
+    // ★ 父页请求“最终日志快照”时回传
+    window.addEventListener('message', (e) => {
+      const msg = e.data;
+      if (msg && msg.type === 'ff_request_dump') {
+        window.parent?.postMessage({ type: 'ff_log_bulk', payload: userLogs }, '*');
+      }
+    });
 
     // ====== Export CSV ======
     function exportLogsAsCSV() {
@@ -431,14 +420,15 @@
     function onActionClick(e) {
       const el = e.target.closest('.action');
       if (!el) return;
-
+      const card = el.closest('.tweet-card');
+      const tweetId = card?.dataset.tweetId;
+      const tweetText = card?.dataset.text;
       const action = el.dataset.action;
       if (!action) return;
-
-      const card = el.closest('.tweet-card');
       const cards = Array.from(document.querySelectorAll('#newsFeed .tweet-card'));
       const tweetIndex = cards.indexOf(card);
 
+      // UI逻辑
       switch (action) {
         case 'like':
           toggleActiveWithCount(el, 'click_like', tweetIndex);
@@ -449,19 +439,16 @@
         case 'comment':
           el.classList.add('active');
           el.setAttribute('aria-pressed', 'true');
-          logAction('click_comment', { step: 1, tweetIndex });
           showCommentModal(el, tweetIndex);
           break;
         case 'stats':
           el.classList.add('active');
           el.setAttribute('aria-pressed', 'true');
-          logAction('click_stats', { step: 1, tweetIndex });
           showViewsModal(el);
           break;
         case 'bookmark':
           const nowActive = el.classList.toggle('active');
           el.setAttribute('aria-pressed', String(nowActive));
-          logAction('click_bookmark', { step: 1, tweetIndex, active: nowActive });
           break;
         case 'share':
           toggleActiveWithCount(el, 'click_share', tweetIndex);
@@ -469,13 +456,21 @@
         default:
           break;
       }
+      // 日志
+      if (action === 'like' || action === 'retweet' || action === 'bookmark' || action === 'share') {
+        // 这些用 toggleActiveWithCount 或 toggleActive
+        const isActive = el.classList.contains('active');
+        logAction('click_' + action, { tweetId, tweetText, active: isActive });
+      } else if (action === 'comment' || action === 'stats') {
+        logAction('click_' + action, { tweetId, tweetText });
+      }
     }
 
     function toggleActiveWithCount(el, logName, tweetIndex) {
       const wasActive = el.classList.toggle('active');
       el.setAttribute('aria-pressed', String(wasActive));
       updateCount(el, wasActive ? +1 : -1);
-      logAction(logName, { step: 1, tweetIndex, active: wasActive });
+      // 日志由 onActionClick 统一处理
     }
 
     function updateCount(el, delta) {
@@ -544,14 +539,14 @@
     function sendComment(tweetIndex) {
       const textarea = document.getElementById('commentInput');
       const comment = textarea.value.trim();
+      const card = document.querySelectorAll('#newsFeed .tweet-card')[tweetIndex];
+      const tweetId = card?.dataset.tweetId;
+      const tweetText = card?.dataset.text;
       if (comment) {
-        logAction('send_comment', { step: 1, tweetIndex, comment });
-
+        logAction('send_comment', { tweetId, tweetText, comment });
         // Increment comment count on the card
-        const card = document.querySelectorAll('#newsFeed .tweet-card')[tweetIndex];
         const commentBtn = card?.querySelector('.action[data-action="comment"]');
         if (commentBtn) updateCount(commentBtn, +1);
-
         alert('Your comment has been sent:\n' + comment);
         closeCommentModal();
       } else {
