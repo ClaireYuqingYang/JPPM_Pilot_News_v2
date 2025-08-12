@@ -190,8 +190,6 @@
           <input type="text" placeholder="Search" />
         </div>
         <div class="topbar-right">
-          <input id="pidInput" class="pid-input" placeholder="Participant ID" />
-          <button id="exportBtn" class="export-btn">Export Logs</button>
           <span class="settings-icon">⚙️</span>
         </div>
       </div>
@@ -425,7 +423,7 @@
       a.click();
       URL.revokeObjectURL(url);
     }
-    document.getElementById('exportBtn').addEventListener('click', exportLogsAsCSV);
+
 
     // ====== Actions (event delegation) ======
     document.getElementById('newsFeed').addEventListener('click', onActionClick);
